@@ -1,0 +1,31 @@
+{
+  "_comment": "Per-model block-level quantities (Table 2, updated). Uniform decoder blocks; embedding at N_0, LM head at a_S (not counted in per-block weight).",
+  "models": {
+    "gemma3-4b": {
+      "L": 34,
+      "d": 2560,
+      "omega_model_gb": 8,
+      "chi_unit_model_kb_per_token": 136
+    },
+    "llama-3.2-8b": {
+      "L": 32,
+      "d": 4096,
+      "omega_model_gb": 16.1,
+      "chi_unit_model_kb_per_token": 128
+    },
+    "qwen3-14b": {
+      "L": 40,
+      "d": 5120,
+      "omega_model_gb": 29.6,
+      "chi_unit_model_kb_per_token": 160
+    }
+  },
+  "default_model": "gemma3-4b",
+  "flops_formula": {
+    "_comment": "Per-block FLOPs. kappa_pf = 2*P*d^2 + 2*P^2*d (FFN + attn); kappa_dec = 2*d^2 + 4*d*(P+t) (FFN + attn over KV). P is prompt length, t is current decode step.",
+    "kappa_pf_const": 2,
+    "kappa_pf_attn": 2,
+    "kappa_dec_const": 2,
+    "kappa_dec_attn": 4
+  }
+}

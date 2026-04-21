@@ -1,0 +1,79 @@
+{
+  "_comment": "Ground-truth drift simulator params. Workload split into compute (FLOPs/sec) and memory (bytes) per Sec.5.2.3 updated.",
+  "workload": {
+    "_comment": "Per-tier workload distributions. Higher tier = more/heavier jobs.",
+    "duration_lognormal_mu_log": 1.6,
+    "duration_lognormal_sigma": 0.5,
+    "obs_noise_rel_std": 0.03,
+    "sampling_hz": 1.0,
+    "q_cap": 1.0,
+    "per_tier": {
+      "high": {
+        "lambda_job_per_sec_range": [0.5, 0.8],
+        "cmp_intensity_frac_of_mu_range": [0.20, 0.50],
+        "mem_footprint_gb_range": [0.5, 3.0]
+      },
+      "mid": {
+        "lambda_job_per_sec_range": [0.2, 0.4],
+        "cmp_intensity_frac_of_mu_range": [0.1, 0.3],
+        "mem_footprint_gb_range": [1.0, 2.0]
+      },
+      "low": {
+        "lambda_job_per_sec_range": [0.1, 0.2],
+        "cmp_intensity_frac_of_mu_range": [0.05, 0.15],
+        "mem_footprint_gb_range": [0.2, 0.8]
+      }
+    }
+  },
+  "network": {
+    "_comment": "Hockney alpha-beta. alpha in seconds, beta in seconds/byte.",
+    "alpha_normal_s": 0.002,
+    "beta_normal_s_per_byte": 2e-9,
+    "degraded_inflation_range": [2.0, 3.0],
+    "p_normal_self": 0.998,
+    "p_degraded_self": 0.95,
+    "ar1_persistence": 0.95,
+    "ar1_std_frac": 0.03
+  },
+  "thermal": {
+    "_comment": "Asymmetric heating/cooling time constants per tier. GT uses asymmetric; Kalman uses symmetric harmonic mean tau_bar.",
+    "use_asymmetric_tau": true,
+    "initial_noise_std_c": 1.0
+  },
+  "regime": {
+    "_comment": "Drift regime toggles. 'default' activates all; others per Sec.5.3.",
+    "active": "default",
+    "default": {
+      "workload_active": true,
+      "thermal_active": true,
+      "network_active": true,
+      "nu_multiplier": 3.0
+    },
+    "R1_calibrated": {
+      "workload_active": false,
+      "thermal_active": false,
+      "network_active": false
+    },
+    "R2_thermal": {
+      "workload_active": true,
+      "thermal_active": true,
+      "network_active": false,
+      "nu_multiplier": 5.0,
+      "theta_th_override": 50.0
+    },
+    "R3_workload": {
+      "workload_active": true,
+      "thermal_active": false,
+      "network_active": false,
+      "psi_override": 0.95,
+      "sigma_eta_sq_override": 0.01
+    },
+    "R4_network": {
+      "workload_active": false,
+      "thermal_active": false,
+      "network_active": true,
+      "beta_doubling": true,
+      "degraded_links": 2
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "_comment": "Experiment-level settings.",
+  "request": {
+    "P_prompt_tokens": 512,
+    "G_hat_tokens": 15000
+  },
+  "schemes": ["SDA", "RT", "FM", "DACI", "OR"],
+  "_schemes_full": ["SDA", "RT", "FM", "DACI", "OR"],
+  "n_traces": 10,
+  "seed_base": 42,
+  "model_name": "qwen3-14b",
+  "cluster": {
+    "_comment": "Tier mix per Sec. 5.2.1. Total N=8.",
+    "high": 1,
+    "mid": 3,
+    "low": 4
+  },
+  "rt_baseline": {
+  "trigger_ratio": 1.2,
+  "cool_down_windows": 50
+  },
+  "logging": {
+    "per_window_dump": true,
+    "dump_fields": ["b", "a", "phi_hat", "theta_gt", "q_gt", "H_r_star", "omega_b", "accepted", "tpot_window", "J_tilde"]
+  },
+  "output_dir": "outputs"
+}
