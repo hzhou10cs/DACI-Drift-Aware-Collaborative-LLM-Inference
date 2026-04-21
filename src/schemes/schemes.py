@@ -78,11 +78,16 @@ class DACIScheme:
         u_future = np.tile(u_curr.reshape(-1, 1), (1, H_max))
         fcst = st.predictor.forecast(cluster, u_future, H_max)
 
-        # --- Ablation: no_predictor (persistence across horizon) ---
+        # --- Ablation: no_predictor (persistence across horizon AND tail) ---
+        # True zero-knowledge baseline: hold current phi constant for both the
+        # K_r-step rollout AND the long-run tail. Otherwise phi_infinity (which
+        # uses AR(1) mu_cmp via predictor.forecast) leaks forecast information
+        # into the surrogate's tail term, which dominates when G_rem >> K_r*W.
         if self.ablation == "no_predictor":
             phi0 = fcst["phi_hat"][:, 0:1]
             fcst["phi_hat"] = np.tile(phi0, (1, H_max))
             fcst["phi_var"] = np.zeros_like(fcst["phi_var"])
+            fcst["phi_infinity"] = fcst["phi_hat"][:, 0].copy()
             qmem0 = fcst["q_mem_hat"][:, 0:1]
             fcst["q_mem_hat"] = np.tile(qmem0, (1, H_max))
 
@@ -130,6 +135,7 @@ class DACIScheme:
             "H_r_star": H_r, "K_r": K_r,
             "J_new": J_new, "J_incumbent": J_incumbent,
             "phi_hat_curr": fcst["phi_hat"][:, 0].tolist(),
+            "phi_hat_horizon": fcst["phi_hat"].tolist(),
             "b_new_candidate": b_new,
             "u_thermal": u_curr.tolist(),
             "ablation": self.ablation,

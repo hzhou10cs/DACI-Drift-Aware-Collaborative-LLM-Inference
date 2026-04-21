@@ -35,9 +35,13 @@ def aggregate(results: List[TraceResult]) -> Dict[str, dict]:
             "TTLT_mean_s": float(np.mean(ttlt)),
             "TTLT_std_s": float(np.std(ttlt)),
             "TTFT_mean_s": float(np.mean(ttft)),
+            "TTFT_std_s": float(np.std(ttft)),
             "P99_TPOT_mean_ms": float(np.mean(p99_tpot)),
+            "P99_TPOT_std_ms": float(np.std(p99_tpot)),
             "Ovhd_mean_s": float(np.mean(ovhd)),
+            "Ovhd_std_s": float(np.std(ovhd)),
             "Nreconf_mean": float(np.mean(nrec)),
+            "Nreconf_std": float(np.std(nrec)),
             "n_traces": len(rs),
         }
     return agg
@@ -77,8 +81,11 @@ def dump_tokens_jsonl(tr: TraceResult, out_path: str) -> None:
 
 def dump_summary_csv(agg: Dict[str, dict], out_path: str) -> None:
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    fields = ["scheme", "TTLT_mean_s", "TTLT_std_s", "TTFT_mean_s",
-              "P99_TPOT_mean_ms", "Ovhd_mean_s", "Nreconf_mean", "n_traces"]
+    fields = ["scheme", "TTLT_mean_s", "TTLT_std_s",
+              "TTFT_mean_s", "TTFT_std_s",
+              "P99_TPOT_mean_ms", "P99_TPOT_std_ms",
+              "Ovhd_mean_s", "Ovhd_std_s",
+              "Nreconf_mean", "Nreconf_std", "n_traces"]
     with open(out_path, "w") as f:
         f.write(",".join(fields) + "\n")
         for scheme, a in agg.items():

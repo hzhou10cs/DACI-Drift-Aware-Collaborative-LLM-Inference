@@ -95,7 +95,6 @@ def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
     phi_now = compute_true_phi(cl, q_cmp_0, ds.theta)
     T_pf = T_prefill(cl, ms, st.b, st.a, phi_now, obs0["link_obs"], P)
     TTFT = T_start + T_pf
-    print(f"  T_start={T_start:.3f}s T_pf={T_pf:.3f}s", flush=True)
     t_wall = T_start + T_pf
 
     TTLT = TTFT
@@ -203,6 +202,7 @@ def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
             "q_mem_gt_gb": [q_mem_win[i] / (1024 ** 3) for i in range(cl.N)],
             "phi_true": true_phi_r.tolist(),
             "phi_hat_curr": meta.get("phi_hat_curr", []),
+            "phi_hat_horizon": meta.get("phi_hat_horizon", []),
             "u_thermal": meta.get("u_thermal", []),
             "H_r_star": meta.get("H_r_star", 0),
             "J_new": meta.get("J_new", None),

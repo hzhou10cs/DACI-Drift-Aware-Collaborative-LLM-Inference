@@ -124,7 +124,7 @@ def main():
             summary = summarize_trace(tr)
             print(f"  seed={seed} TTLT={tr.TTLT_s:.2f}s TTFT={tr.TTFT_s:.2f}s "
                   f"P99TPOT={summary['TPOT_p99_ms']:.1f}ms "
-                  f"Ovhd={tr.overhead_s:.2f}s #Rec={tr.n_reconfigs} ({dt:.1f}s)", flush=True)
+                  f"Ovhd={tr.overhead_s:.2f}s #Rec={tr.n_reconfigs} ({dt:.1f}s)")
             all_results.append(tr)
             if args.log_level == "full":
                 dump_trace_jsonl(tr, str(out_dir / "traces" / f"{scheme_name}_seed{seed}.jsonl"))
@@ -138,8 +138,9 @@ def main():
     print(f"\n== Summary ==")
     for scheme, a in agg.items():
         print(f"  {scheme}: TTLT={a['TTLT_mean_s']:.2f}±{a['TTLT_std_s']:.2f}s, "
-              f"P99TPOT={a['P99_TPOT_mean_ms']:.1f}ms, Ovhd={a['Ovhd_mean_s']:.2f}s, "
-              f"#Rec={a['Nreconf_mean']:.2f}")
+              f"P99TPOT={a['P99_TPOT_mean_ms']:.1f}±{a['P99_TPOT_std_ms']:.1f}ms, "
+              f"Ovhd={a['Ovhd_mean_s']:.2f}±{a['Ovhd_std_s']:.2f}s, "
+              f"#Rec={a['Nreconf_mean']:.2f}±{a['Nreconf_std']:.2f}")
     print(f"Total wall time: {time.time()-t0:.1f}s")
     print(f"Output saved to: {out_dir}")
 

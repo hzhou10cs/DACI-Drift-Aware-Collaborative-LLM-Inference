@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Exp4-A: Window length W sweep (§5.5)
+# Exp4-A: §5.5 Window length W sweep.
+# Default model: qwen3-14b (largest). 5 traces per W value.
 set -euo pipefail
 
 EXP_NAME="exp4_sensitivity/W_sweep"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/outputs/${EXP_NAME}"
-N_TRACES=20
-SEED_START=42
-PARALLEL_JOBS=${PARALLEL_JOBS:-4}
+N_TRACES=${N_TRACES:-1}
+SEED_START=${SEED_START:-42}
+MODEL_NAME=${MODEL_NAME:-qwen3-14b}
+PARALLEL_JOBS=${PARALLEL_JOBS:-5}
 
 cd "${PROJECT_ROOT}"
 
@@ -23,16 +25,18 @@ run_one() {
         --n_traces "${N_TRACES}" \
         --seed_start "${SEED_START}" \
         --regime default \
+        --model_name "${MODEL_NAME}" \
         --W_tokens "${W}" \
         --log_level summary_only \
-        > "${OUTPUT_DIR}/W_${W}.log" 2>&1
+        2>&1 | sed "s|^|[W=${W}] |" | tee "${OUTPUT_DIR}/W_${W}.log"
     echo "[done] W=${W}"
 }
 
 export -f run_one
-export OUTPUT_DIR N_TRACES SEED_START PROJECT_ROOT
+export OUTPUT_DIR N_TRACES SEED_START MODEL_NAME PROJECT_ROOT
 
 mkdir -p "${OUTPUT_DIR}"
 printf '%s\n' "${W_VALUES[@]}" | xargs -I{} -P "${PARALLEL_JOBS}" bash -c 'run_one "$@"' _ {}
 
-echo "=== W_sweep complete ==="
+echo ""
+echo "=== W_sweep complete. Model=${MODEL_NAME} Traces=${N_TRACES} ==="

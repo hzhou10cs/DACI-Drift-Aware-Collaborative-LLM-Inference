@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Exp4-B: Horizon ceiling H_max sweep (§5.5)
+# Exp4-B: §5.5 Horizon ceiling H_max sweep.
+# Default model: qwen3-14b. 5 traces per H value.
 set -euo pipefail
 
 EXP_NAME="exp4_sensitivity/H_sweep"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/outputs/${EXP_NAME}"
-N_TRACES=20
-SEED_START=42
-PARALLEL_JOBS=${PARALLEL_JOBS:-4}
+N_TRACES=${N_TRACES:-1}
+SEED_START=${SEED_START:-42}
+MODEL_NAME=${MODEL_NAME:-qwen3-14b}
+PARALLEL_JOBS=${PARALLEL_JOBS:-5}
 
 cd "${PROJECT_ROOT}"
 
-H_VALUES=(1 3 5 8 16)
+H_VALUES=(6 10 14)
 
 run_one() {
     local H="$1"
@@ -23,16 +25,18 @@ run_one() {
         --n_traces "${N_TRACES}" \
         --seed_start "${SEED_START}" \
         --regime default \
+        --model_name "${MODEL_NAME}" \
         --H_max "${H}" \
         --log_level summary_only \
-        > "${OUTPUT_DIR}/H_${H}.log" 2>&1
+        2>&1 | sed "s|^|[H=${H}] |" | tee "${OUTPUT_DIR}/H_${H}.log"
     echo "[done] H_max=${H}"
 }
 
 export -f run_one
-export OUTPUT_DIR N_TRACES SEED_START PROJECT_ROOT
+export OUTPUT_DIR N_TRACES SEED_START MODEL_NAME PROJECT_ROOT
 
 mkdir -p "${OUTPUT_DIR}"
 printf '%s\n' "${H_VALUES[@]}" | xargs -I{} -P "${PARALLEL_JOBS}" bash -c 'run_one "$@"' _ {}
 
-echo "=== H_sweep complete ==="
+echo ""
+echo "=== H_sweep complete. Model=${MODEL_NAME} Traces=${N_TRACES} ==="

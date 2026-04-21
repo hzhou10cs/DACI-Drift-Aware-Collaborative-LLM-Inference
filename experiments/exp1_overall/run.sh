@@ -7,7 +7,7 @@ set -euo pipefail
 
 EXP_NAME="exp1_overall"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-N_TRACES=1
+N_TRACES=5
 SEED_START=42
 PARALLEL_JOBS=${PARALLEL_JOBS:-5}
 

@@ -115,7 +115,7 @@ def agg_sensitivity(exp_dir: Path):
 
 
 def agg_scalability(exp_dir: Path):
-    for sub_exp in ["G_sweep"]:
+    for sub_exp in ["N_sweep", "L_sweep", "G_sweep"]:
         sub_path = exp_dir / sub_exp
         if not sub_path.exists():
             continue
@@ -128,10 +128,8 @@ def agg_scalability(exp_dir: Path):
         write_csv(rows, sub_path / "_aggregate.csv", fields)
 
 
-def agg_predictor(exp_dir: Path, leads=None):
+def agg_predictor(exp_dir: Path):
     """Compute RMSE of phi_hat vs phi_true at multiple leads k.
-
-    leads: list of k values to highlight in stdout. CSV always contains all k.
 
     For each window r, the simulator dumps:
       - phi_true: ground-truth phi evaluated at the window itself (r)
@@ -144,8 +142,6 @@ def agg_predictor(exp_dir: Path, leads=None):
     Also computes a persistence baseline (zero-knowledge): predicting phi(r+k)
     as phi(r) itself -> RMSE_k_persist = sqrt(mean (phi_true[r+k] - phi_true[r])^2).
     """
-    if leads is None:
-        leads = [1, 4, 7]
     per_lead = {}       # k -> list of squared residuals (kalman+ar1)
     per_lead_pers = {}  # k -> list (persistence baseline)
 
@@ -210,7 +206,7 @@ def agg_predictor(exp_dir: Path, leads=None):
     print(f"wrote -> {out_path}")
     if per_lead:
         print("\nRMSE at key leads:")
-        for k in leads:
+        for k in [1, 4, 8]:
             if k in per_lead:
                 rmse_ka = float(np.sqrt(np.mean(per_lead[k])))
                 rmse_pe = float(np.sqrt(np.mean(per_lead_pers[k]))) if k in per_lead_pers else float("nan")
@@ -233,7 +229,7 @@ MODES = {
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python aggregate.py <mode> <experiment_dir> [--leads 1,4,7]")
+        print("Usage: python aggregate.py <mode> <experiment_dir>")
         print(f"Modes: {list(MODES.keys())}")
         sys.exit(1)
     mode, exp_dir = sys.argv[1], Path(sys.argv[2])
@@ -243,21 +239,7 @@ def main():
     if not exp_dir.exists():
         print(f"Dir not found: {exp_dir}")
         sys.exit(1)
-
-    # Parse optional --leads for predictor mode
-    leads = None
-    for i, arg in enumerate(sys.argv):
-        if arg == "--leads" and i + 1 < len(sys.argv):
-            try:
-                leads = [int(x) for x in sys.argv[i + 1].split(",")]
-            except ValueError:
-                print("--leads must be comma-separated integers, e.g. --leads 1,4,7")
-                sys.exit(1)
-
-    if mode == "predictor":
-        MODES[mode](exp_dir, leads=leads)
-    else:
-        MODES[mode](exp_dir)
+    MODES[mode](exp_dir)
 
 
 if __name__ == "__main__":

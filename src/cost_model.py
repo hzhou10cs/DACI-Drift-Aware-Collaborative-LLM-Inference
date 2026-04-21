@@ -78,7 +78,10 @@ def H_stage(cluster: Cluster, ms: ModelSpec,
         kv_bytes = n_blk * (P + t_r) * ms.chi_unit_block_bytes_per_token
         alpha, beta = link_state[(donor_node, a[s_idx - 1])]
         kv_time += alpha + beta * kv_bytes
-    return loading_time + kv_time
+    swap_cost = 0.0
+    if s_idx - 1 < len(a_prev) and a_prev[s_idx - 1] != a[s_idx - 1]:
+        swap_cost = node_new.H_swap_s
+    return loading_time + kv_time + swap_cost
 
 
 def Omega_reconfig(cluster: Cluster, ms: ModelSpec,
