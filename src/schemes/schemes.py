@@ -5,7 +5,7 @@ import numpy as np
 from src.cluster import Cluster
 from src.model_spec import ModelSpec
 from src.predictor import Predictor, adaptive_horizon
-from src.dp import solve_initial_dp, solve_runtime_dp, eval_surrogate
+from src.dp import solve_initial_dp, solve_runtime_dp, eval_surrogate, _ordered_placements
 from src.cost_model import T_decode_window, compute_u_thermal, stage_mem_bytes
 
 
@@ -171,6 +171,78 @@ class SDAScheme(DACIScheme):
         return st.b, False, meta
 
 
+
+def _feasible_pool(cluster, ms, st, obs, P, t_end, q_mem_by_node):
+    """Nodes that could host at least the SMALLEST stage, over ALL N nodes.
+
+    Deliberately does not exclude nodes already hosting a stage. Reassigning
+    which stage sits on an already-used node is still a placement change: it
+    reloads weights, migrates KV and pays H_swap. The previous code skipped
+    every node in `set(st.a)`, which restricted both RT and FM to swapping onto
+    an IDLE node -- so at S=N the candidate pool was empty in every window, RT
+    performed zero reconfigurations and was numerically identical to SDA, and
+    FM collapsed onto DACI. That made them strawmen rather than baselines.
+
+    The filter here is deliberately LOOSE. Screening on the largest stage
+    instead looks safer and is wrong: with S stages and a tightened memory
+    budget (the Orin Nano is 8 GB, not 12) the pool shrinks below S, no
+    permutation exists at all, and the search silently degenerates to "never
+    move" -- which is the same strawman in a new disguise. Per-stage
+    feasibility is checked inside the enumeration, where it belongs, because
+    whether a node fits depends on which stage it is asked to host.
+    """
+    smallest = min(st.b[i + 1] - st.b[i] for i in range(st.S))
+    need = _stage_mem_need(ms, smallest, P, t_end)
+    pool = []
+    for n in range(cluster.N):
+        m_eff = max(0.0, cluster.nodes[n].m_bytes - q_mem_by_node[n])
+        if need <= m_eff:
+            pool.append(n)
+    return pool
+
+
+def _best_placement(cluster, ms, st, pool, P, t_r, G_rem, W, K_r,
+                    phi_hat_horizon, phi_infinity, link_obs,
+                    q_mem_by_node, t_end, max_perms=20000):
+    """Search ordered S-permutations of `pool`, scored by the surrogate.
+
+    This is the joint placement search paper Sec. 5.1.5 describes for RT
+    ("re-runs the joint placement-boundary DP"). Placement is chosen against
+    the same surrogate objective the DP optimises -- including H_stage, so a
+    candidate is charged for the weight reload, KV migration and H_swap that
+    moving to it would cost -- and the boundary is then re-optimised under the
+    winner by the caller's runtime DP.
+
+    Scoring with the surrogate rather than a full DP per permutation keeps this
+    affordable: P(8,4)=1680 candidates cost one O(S*L) evaluation each, versus
+    1680 dynamic programs.
+    """
+    best_a, best_J = None, float("inf")
+    n_eval = 0
+    for a_cand in _ordered_placements(pool, st.S):
+        # Per-stage memory feasibility: node a_cand[s-1] must hold stage s's
+        # own blocks, which is what makes a loose pool filter safe.
+        ok = True
+        for s in range(1, st.S + 1):
+            n_blocks = st.b[s] - st.b[s - 1]
+            node = cluster.nodes[a_cand[s - 1]]
+            m_eff = max(0.0, node.m_bytes - q_mem_by_node[a_cand[s - 1]])
+            if _stage_mem_need(ms, n_blocks, P, t_end) > m_eff:
+                ok = False
+                break
+        if not ok:
+            continue
+        n_eval += 1
+        if n_eval > max_perms:
+            break
+        J = eval_surrogate(cluster, ms, st.S, a_cand, st.b, st.b, st.a,
+                           ms.L, P, t_r, G_rem, W, K_r,
+                           phi_hat_horizon, phi_infinity, link_obs)
+        if J < best_J:
+            best_J, best_a = J, list(a_cand)
+    return best_a, best_J, n_eval
+
+
 class RTScheme(DACIScheme):
     name = "RT"
 
@@ -208,30 +280,21 @@ class RTScheme(DACIScheme):
             hot_stage_idx = int(np.argmax(stage_phi))  # 0-indexed within stages
             hot_node = st.a[hot_stage_idx]
 
-            in_stage = set(st.a)
-            # Candidate pool: non-stage nodes with enough memory for the hot stage's blocks
-            n_blocks_hot = st.b[hot_stage_idx + 1] - st.b[hot_stage_idx]
-            need_mem = _stage_mem_need(ms, n_blocks_hot, P, t_r + G_rem)
-            candidates = []
-            for n in range(cluster.N):
-                if n in in_stage:
-                    continue
-                node = cluster.nodes[n]
-                m_eff = max(0.0, node.m_bytes - obs["q_mem_obs"][n])
-                if need_mem <= m_eff:
-                    candidates.append(n)
-            if candidates:
-                cool_node = min(candidates, key=lambda n: phi_now[n])
-                # Propose a_new with swap
-                a_new = list(st.a)
-                a_new[hot_stage_idx] = cool_node
-                # Re-optimize b given a_new via runtime DP (frozen placement = a_new)
-                H_max = self.algo["window"]["H_max"]
-                K_r = min(H_max, max(1, (G_rem + W - 1) // W))
-                # Use current phi as horizon (reactive, no prediction)
-                phi_hat_horizon = np.tile(phi_now.reshape(-1, 1), (1, H_max))
-                phi_inf = phi_now.copy()
-                q_mem_hat = np.tile(obs["q_mem_obs"].reshape(-1, 1), (1, H_max))
+            # Joint placement search over ALL N nodes (Sec. 5.1.5), not just
+            # idle ones -- see _feasible_pool for why the old restriction made
+            # this a strawman.
+            H_max = self.algo["window"]["H_max"]
+            K_r = min(H_max, max(1, (G_rem + W - 1) // W))
+            phi_hat_horizon = np.tile(phi_now.reshape(-1, 1), (1, H_max))
+            phi_inf = phi_now.copy()
+            q_mem_hat = np.tile(obs["q_mem_obs"].reshape(-1, 1), (1, H_max))
+            pool = _feasible_pool(cluster, ms, st, obs, P, t_r + G_rem,
+                                  obs["q_mem_obs"])
+            a_new, _J_cand, _n_eval = _best_placement(
+                cluster, ms, st, pool, P, t_r, G_rem, W, K_r,
+                phi_hat_horizon, phi_inf, obs["link_obs"],
+                obs["q_mem_obs"], t_r + G_rem)
+            if a_new is not None:
                 max_shift = self.algo.get("dp", {}).get("max_boundary_shift", None)
                 J_new, b_new = solve_runtime_dp(
                     cluster, ms, st.S, a_new, st.b, st.a, ms.L, P, t_r, G_rem, W, K_r,
@@ -241,11 +304,12 @@ class RTScheme(DACIScheme):
                 # Reactive: accept if J_new improves (no lazy slack; trigger has already fired)
                 if b_new is not None and J_new < tpot_now * G_rem:
                     old_a = st.a
+                    changed = list(a_new) != list(st.a)
                     st.a = a_new
                     self._last_trigger_r = r_now
                     meta = {"H_r_star": 0, "K_r": K_r, "J_new": J_new,
                             "J_incumbent": tpot_now * G_rem, "phi_hat_curr": phi_now.tolist(),
-                            "b_new_candidate": b_new, "placement_changed": True,
+                            "b_new_candidate": b_new, "placement_changed": changed,
                             "a_prev_for_omega": old_a, "u_thermal": u_curr.tolist()}
                     return b_new, True, meta
 
@@ -272,31 +336,18 @@ class FMScheme(DACIScheme):
                                min_horizon=self.algo["predictor"]["adaptive_horizon"]["min_horizon"])
         K_r = min(H_r, max(1, (G_rem + W - 1) // W))
 
-        # Greedy 1-swap placement: hot stage -> coolest feasible non-stage node
+        # Joint placement search over ALL N nodes, on the forecast horizon.
         phi_hat_curr = fcst["phi_hat"][:, 0]
-        stage_phi = [phi_hat_curr[st.a[s - 1]] for s in range(1, st.S + 1)]
-        hot_stage_idx = int(np.argmax(stage_phi))
-        n_blocks_hot = st.b[hot_stage_idx + 1] - st.b[hot_stage_idx]
-        need_mem = _stage_mem_need(ms, n_blocks_hot, P, t_r + G_rem)
-        in_stage = set(st.a)
-        candidates = []
-        for n in range(cluster.N):
-            if n in in_stage:
-                continue
-            node = cluster.nodes[n]
-            # Use forecast horizon max for memory feasibility (consistent w/ DP Eq.26)
-            q_mem_max_h = float(np.max(fcst["q_mem_hat"][n, :K_r]))
-            m_eff = max(0.0, node.m_bytes - q_mem_max_h)
-            if need_mem <= m_eff:
-                candidates.append(n)
+        # Memory feasibility uses the horizon max, consistent with DP Eq.(26).
+        q_mem_max_h = np.max(fcst["q_mem_hat"][:, :K_r], axis=1)
+        pool = _feasible_pool(cluster, ms, st, obs, P, t_r + G_rem, q_mem_max_h)
+        a_best, _J_cand, _n_eval = _best_placement(
+            cluster, ms, st, pool, P, t_r, G_rem, W, K_r,
+            fcst["phi_hat"], fcst["phi_infinity"], obs["link_obs"],
+            q_mem_max_h, t_r + G_rem)
 
-        a_new = list(st.a)
-        swapped = False
-        if candidates:
-            cool_node = min(candidates, key=lambda n: phi_hat_curr[n])
-            if phi_hat_curr[cool_node] < stage_phi[hot_stage_idx]:
-                a_new[hot_stage_idx] = cool_node
-                swapped = True
+        a_new = list(a_best) if a_best is not None else list(st.a)
+        swapped = a_new != list(st.a)
 
         # Re-optimize b under a_new (or a unchanged if no swap)
         max_shift = self.algo.get("dp", {}).get("max_boundary_shift", None)

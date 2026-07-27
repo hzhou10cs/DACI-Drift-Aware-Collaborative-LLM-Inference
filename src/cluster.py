@@ -73,9 +73,22 @@ def build_cluster(cfg: dict, mix: Dict[str, int], seed: int = 0) -> Cluster:
                 tau_down_s=t["tau_down_s"],
                 q_cmp_base_flops=t.get("q_cmp_base_tflops", 0.0) * 1e12,
                 q_mem_base_bytes=t.get("q_mem_base_gb", 0.0) * (1024 ** 3),
+                # BUGFIX: this was omitted, so every node silently took the
+                # dataclass default of 0.0 while devices.json specified
+                # 2.5/3/4 s per tier. cost_model.H_stage reads
+                # node_new.H_swap_s, so NO scheme was ever charged for a
+                # placement swap -- which understates exactly the baselines
+                # (RT, FM) that swap placement, and only those.
+                H_swap_s=t["H_swap_s"],
             ))
             idx += 1
-    bl = LinkBaseline(alpha_s=0.0003, beta_s_per_byte=1e-9)
+    # BUGFIX: beta was hardcoded at 1e-9 s/byte = 1 GB/s = 8 Gbps, and the
+    # paper calls it "GbE-class". Real 1 GbE is 8 ns/byte, so every
+    # communication cost was understated 8x. Now read from config, defaulting
+    # to the corrected value rather than the old one.
+    link_cfg = cfg["devices"].get("link", {})
+    bl = LinkBaseline(alpha_s=link_cfg.get("alpha_s", 0.0003),
+                      beta_s_per_byte=link_cfg.get("beta_s_per_byte", 8e-9))
     return Cluster(nodes=nodes, baseline_link=bl,
                    theta_amb=therm["theta_amb_c"],
                    T_W_sec=therm.get("T_W_sec", 1.0))

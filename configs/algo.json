@@ -38,16 +38,6 @@
     }
   },
   "dp": {
-    "u_discretization": "unique",
-    "u_grid_n_bins": 64,
     "max_boundary_shift": 4
-  },
-  "latency_model": {
-    "_comment": "'sum' matches paper Eq.(6); 'max' uses pipeline steady-state; 'mixed' = prefill sum + decode max.",
-    "mode": "sum"
-  },
-  "weight_residency": {
-    "_comment": "'strict': node holds only current-b blocks; boundary expansion triggers L_n(Delta). Paper Eq.(7) is strict.",
-    "mode": "strict"
   }
 }

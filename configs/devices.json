@@ -1,11 +1,5 @@
 {
   "_comment": "Per-tier baseline parameters (Table 1, updated). mu_n is the BASELINE EFFECTIVE compute rate (TFLOPS), already accounting for realistic achievable throughput. delta_n removed: memory drift now uses m_n^r = m_n - q_mem directly. Kalman process noise and sensor noise are both sigma_v^2.",
-  "effective_utilization": {
-    "_comment": "DEPRECATED (kept at 1.0 for compatibility). mu_n in tiers below is already effective.",
-    "default": 0.1,
-    "prefill": 0.1,
-    "decode": 0.1
-  },
   "tiers": {
     "high": {
       "prototype": "Orin AGX",
@@ -19,9 +13,9 @@
       "rho": 1.2,
       "tau_up_s": 3.0,
       "tau_down_s": 6.0,
-      "q_cmp_base_tflops": 0.4, 
+      "q_cmp_base_tflops": 0.4,
       "q_mem_base_gb": 15,
-      "H_swap_s": 2.5 
+      "H_swap_s": 2.5
     },
     "mid": {
       "prototype": "Orin NX",
@@ -35,15 +29,15 @@
       "rho": 1.5,
       "tau_up_s": 2.5,
       "tau_down_s": 5.0,
-      "q_cmp_base_tflops": 0.2, 
-      "q_mem_base_gb": 6 ,
+      "q_cmp_base_tflops": 0.2,
+      "q_mem_base_gb": 6,
       "H_swap_s": 3
     },
     "low": {
       "prototype": "Orin Nano",
       "count": 4,
       "mu_baseline_tflops": 0.4,
-      "m_gb": 12.0,
+      "m_gb": 8.0,
       "B_load_gbps": 0.5,
       "gamma": 0.04,
       "theta_th": 60.0,
@@ -53,7 +47,8 @@
       "tau_down_s": 4.5,
       "q_cmp_base_tflops": 0.02,
       "q_mem_base_gb": 0.1,
-      "H_swap_s": 4
+      "H_swap_s": 4,
+      "_m_gb_comment": "Orin Nano Super is 8 GB, not 12. Memory feasibility is a hard DP constraint (Eq. 10d), so this changes which placements are legal."
     }
   },
   "thermal": {
@@ -63,5 +58,10 @@
     "process_noise_var": 0.5,
     "T_W_sec": 1.0,
     "_T_W_comment": "Fixed thermal discretization step T_W (seconds), decoupled from control window W. Defines zeta_n = 1 - exp(-T_W/tau_n). Physics ticks at this rate regardless of W_sec."
+  },
+  "link": {
+    "_comment": "Baseline link. beta was hardcoded in cluster.py at 1e-9 s/byte = 8 Gbps and described as GbE-class; real 1 GbE is 8e-9.",
+    "alpha_s": 0.0003,
+    "beta_s_per_byte": 8e-09
   }
 }
