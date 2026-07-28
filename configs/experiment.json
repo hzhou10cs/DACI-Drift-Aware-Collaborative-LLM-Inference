@@ -31,21 +31,6 @@
     "trigger_ratio": 1.2,
     "cool_down_windows": 50
   },
-  "logging": {
-    "per_window_dump": true,
-    "dump_fields": [
-      "b",
-      "a",
-      "phi_hat",
-      "theta_gt",
-      "q_gt",
-      "H_r_star",
-      "omega_b",
-      "accepted",
-      "tpot_window",
-      "J_tilde"
-    ]
-  },
   "output_dir": "outputs",
   "_cluster_fixtures": {
     "_comment": "Named fixtures; `cluster` selects the active mix.",
@@ -60,5 +45,21 @@
       "low": 2,
       "_comment": "The physical testbed: two Orin Nanos, N=2, S=2, one boundary. Both are 'low' tier -- Orin Nano is exactly what that tier describes. The 8-node mix no longer describes anything runnable, so predicted-vs-measured needs this fixture."
     }
+  },
+  "_dead_logging": {
+    "per_window_dump": true,
+    "dump_fields": [
+      "b",
+      "a",
+      "phi_hat",
+      "theta_gt",
+      "q_gt",
+      "H_r_star",
+      "omega_b",
+      "accepted",
+      "tpot_window",
+      "J_tilde"
+    ],
+    "_note": "Never read. run.py always writes per-window JSONL and ignores dump_fields, so this describes behaviour it does not control."
   }
 }

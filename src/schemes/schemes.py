@@ -95,8 +95,15 @@ class DACIScheme:
         if self.ablation == "no_adaptive_H":
             H_r = H_max
         else:
-            H_r = adaptive_horizon(fcst["phi_hat"], fcst["phi_var"], tau_cv, H_max, st.a,
-                                   min_horizon=self.algo["predictor"]["adaptive_horizon"]["min_horizon"])
+            ah = self.algo["predictor"]["adaptive_horizon"]
+            # `enabled` used to be ignored: the adaptive horizon ran
+            # unconditionally and setting the flag false did nothing. The
+            # no_adaptive_H ablation was the only way to disable it, so the
+            # config knob was a lie. Default is true, so honouring it changes
+            # no existing result.
+            H_r = (adaptive_horizon(fcst["phi_hat"], fcst["phi_var"], tau_cv,
+                                    H_max, st.a, min_horizon=ah["min_horizon"])
+                   if ah.get("enabled", True) else H_max)
         K_r = min(H_r, max(1, (G_rem + W - 1) // W))
 
         # --- Ablation: no_bottleneck (greedy, ignores H_s during search) ---
@@ -332,8 +339,10 @@ class FMScheme(DACIScheme):
         tau_cv = self.algo["window"]["tau_variance"]
         u_future = np.tile(u_curr.reshape(-1, 1), (1, H_max))
         fcst = st.predictor.forecast(cluster, u_future, H_max)
-        H_r = adaptive_horizon(fcst["phi_hat"], fcst["phi_var"], tau_cv, H_max, st.a,
-                               min_horizon=self.algo["predictor"]["adaptive_horizon"]["min_horizon"])
+        ah = self.algo["predictor"]["adaptive_horizon"]
+        H_r = (adaptive_horizon(fcst["phi_hat"], fcst["phi_var"], tau_cv,
+                                H_max, st.a, min_horizon=ah["min_horizon"])
+               if ah.get("enabled", True) else H_max)
         K_r = min(H_r, max(1, (G_rem + W - 1) // W))
 
         # Joint placement search over ALL N nodes, on the forecast horizon.

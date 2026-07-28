@@ -5,8 +5,6 @@
     "duration_lognormal_mu_log": 1.6,
     "duration_lognormal_sigma": 0.5,
     "obs_noise_rel_std": 0.03,
-    "sampling_hz": 1.0,
-    "q_cap": 1.0,
     "per_tier": {
       "high": {
         "lambda_job_per_sec_range": [
@@ -50,7 +48,10 @@
           0.8
         ]
       }
-    }
+    },
+    "_dead_sampling_hz": 1.0,
+    "_dead_q_cap": 1.0,
+    "_dead_note": "sampling_hz and q_cap were never read. Sampling is driven by thermal.T_W_sec and the workload superposition is uncapped."
   },
   "network": {
     "_comment": "Hockney alpha-beta. alpha in seconds, beta in seconds/byte. THIS IS THE LIVE PAIR: drift_gt.observed_sensor builds link_obs from it, and every DP and cost path reads link_obs. cluster.baseline_link is NOT consulted -- see cluster.py.",
@@ -98,8 +99,9 @@
   },
   "thermal": {
     "_comment": "Asymmetric heating/cooling time constants per tier. GT uses asymmetric; Kalman uses symmetric harmonic mean tau_bar.",
-    "use_asymmetric_tau": true,
-    "initial_noise_std_c": 1.0
+    "initial_noise_std_c": 1.0,
+    "_dead_use_asymmetric_tau": true,
+    "_dead_note": "use_asymmetric_tau was never read: tau_bar is ALWAYS the harmonic mean of tau_up and tau_down (cluster.Node.tau_bar_s), so the asymmetry is unconditionally collapsed regardless of this flag."
   },
   "regime": {
     "_comment": "Drift regime toggles. 'default' activates all; others per Sec.5.3.",
