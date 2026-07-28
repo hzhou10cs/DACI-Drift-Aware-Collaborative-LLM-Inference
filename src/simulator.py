@@ -24,6 +24,7 @@ class TraceResult:
     TTFT_s: float
     TPOT_series_s: List[float] = field(default_factory=list)
     overhead_s: float = 0.0
+    controller_s: float = 0.0
     n_reconfigs: int = 0
     windows: List[dict] = field(default_factory=list)
     device_seconds: List[dict] = field(default_factory=list)  # per-second snapshots
@@ -56,6 +57,34 @@ def _precompute_oracle(cl: Cluster, cfg: dict, seed: int,
         t += W_sec_nom
     return {"phi_seq": np.array(phi_seq).T, "q_mem_seq": np.array(q_mem_seq).T}
 
+
+
+def _controller_ms(cfg: dict, scheme_name: str, N: int, S: int) -> float:
+    """Per-window controller cost in ms, or 0.0 when not charged.
+
+    The simulator prices migration and not deciding. That asymmetry favours
+    whichever scheme searches hardest, because its search is free: FM
+    enumerates ordered placements every window while DACI runs one boundary DP.
+    Measured on a Jetson core, FM costs 81 ms/window at N=8 against DACI's 7.5.
+
+    Off by default. A missing table entry charges zero and warns once rather
+    than guessing, because a silently-zero cost is what this exists to fix.
+    """
+    cc = cfg.get("experiment", {}).get("controller_cost", {})
+    if not cc.get("enabled", False):
+        return 0.0
+    key = f"N{N}_S{S}"
+    entry = cc.get("table_ms", {}).get(key)
+    if entry is None or scheme_name not in entry:
+        if key not in _CTRL_WARNED:
+            _CTRL_WARNED.add(key)
+            print(f"  [controller_cost] no entry for {key}/{scheme_name}; "
+                  f"charging 0. Measure it with bench_controller.py.")
+        return 0.0
+    return float(entry[scheme_name])
+
+
+_CTRL_WARNED = set()
 
 def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
               seed: int, verbose: bool = False) -> TraceResult:
@@ -99,6 +128,7 @@ def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
 
     TTLT = TTFT
     overhead_total = 0.0
+    controller_total = 0.0
     n_reconf = 0
     tpot_series: List[float] = []
     windows_log: List[dict] = []
@@ -169,6 +199,15 @@ def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
             TTLT += omega
             t_wall += omega
 
+        # The controller's own optimisation time, charged like any other
+        # wall-clock cost. It is paid every window whether or not the decision
+        # is accepted -- deciding not to move still costs the search.
+        ctrl_s = _controller_ms(cfg, scheme_name, cl.N, st.S) / 1000.0
+        if ctrl_s:
+            TTLT += ctrl_s
+            t_wall += ctrl_s
+            controller_total += ctrl_s
+
         st.b = b_new
         b_prev = list(st.b)
         a_prev = list(st.a)
@@ -218,6 +257,7 @@ def run_trace(cl: Cluster, ms: ModelSpec, cfg: dict, scheme_name: str,
         scheme=scheme_name, seed=seed,
         TTLT_s=TTLT, TTFT_s=TTFT, TPOT_series_s=tpot_series,
         overhead_s=overhead_total, n_reconfigs=n_reconf,
+        controller_s=controller_total,
         windows=windows_log,
         device_seconds=device_seconds,
         tokens=tokens_log,

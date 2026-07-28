@@ -45,6 +45,7 @@ DYNAMIC_CONTAINERS = {
     "per_tier",          # drift.json: per_tier[node.tier]
     "regime",            # drift.json: regime[regime["active"]]
     "cluster",           # experiment.json: mix.get(tier_name)
+    "table_ms",          # experiment.json: table_ms[f"N{N}_S{S}"]
 }
 
 # Keys read outside src/ but legitimately part of the contract.
