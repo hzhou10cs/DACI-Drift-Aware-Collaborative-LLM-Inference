@@ -82,13 +82,19 @@ def build_cluster(cfg: dict, mix: Dict[str, int], seed: int = 0) -> Cluster:
                 H_swap_s=t["H_swap_s"],
             ))
             idx += 1
-    # BUGFIX: beta was hardcoded at 1e-9 s/byte = 1 GB/s = 8 Gbps, and the
-    # paper calls it "GbE-class". Real 1 GbE is 8 ns/byte, so every
-    # communication cost was understated 8x. Now read from config, defaulting
-    # to the corrected value rather than the old one.
-    link_cfg = cfg["devices"].get("link", {})
-    bl = LinkBaseline(alpha_s=link_cfg.get("alpha_s", 0.0003),
-                      beta_s_per_byte=link_cfg.get("beta_s_per_byte", 8e-9))
+    # ONE SOURCE OF TRUTH. This field used to be built from devices.json's
+    # own `link` block, and NOTHING EVER READ IT -- every DP and cost path
+    # takes its alpha/beta from obs["link_obs"], which drift_gt builds from
+    # drift.network. So an M5a correction applied to the devices.json block
+    # changed no result at all, while looking authoritative enough that the
+    # error survived a full 30-trace regeneration and a hardware comparison.
+    #
+    # It is now read from the same place drift_gt reads, so the two cannot
+    # disagree. If you are looking for the constants that actually shape a
+    # result, they are in configs/drift.json under `network`.
+    net = cfg.get("drift", {}).get("network", {})
+    bl = LinkBaseline(alpha_s=net.get("alpha_normal_s", 487.1e-6),
+                      beta_s_per_byte=net.get("beta_normal_s_per_byte", 9.126e-9))
     return Cluster(nodes=nodes, baseline_link=bl,
                    theta_amb=therm["theta_amb_c"],
                    T_W_sec=therm.get("T_W_sec", 1.0))

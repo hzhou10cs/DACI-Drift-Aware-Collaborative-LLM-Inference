@@ -59,9 +59,5 @@
     "T_W_sec": 1.0,
     "_T_W_comment": "Fixed thermal discretization step T_W (seconds), decoupled from control window W. Defines zeta_n = 1 - exp(-T_W/tau_n). Physics ticks at this rate regardless of W_sec."
   },
-  "link": {
-    "_comment": "Baseline link. beta was hardcoded in cluster.py at 1e-9 s/byte = 8 Gbps and described as GbE-class; real 1 GbE is 8e-9.",
-    "alpha_s": 0.0003,
-    "beta_s_per_byte": 8e-09
-  }
+  "_link_moved": "The `link` block used to live here and was DEAD: build_cluster populated Cluster.baseline_link from it and nothing ever read that field, so an M5a correction applied here changed no result. The live link constants are drift.network.{alpha_normal_s,beta_normal_s_per_byte}, which drift_gt turns into link_obs. cluster.py now reads the same source so there is exactly one."
 }
